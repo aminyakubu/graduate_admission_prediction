@@ -1,0 +1,133 @@
+---
+title: "Graduate Admission Prediction"
+author: "Amin Yakubu"
+date: "4/3/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Loading libraries
+```{r}
+library(tidyverse)
+library(caret)
+library(glmnet)
+library(MASS)
+library(e1071)
+library(mlbench)
+library(pROC)
+library(AppliedPredictiveModeling)
+```
+
+
+```{r}
+admit_df = read_csv('data/Admission_Predict_Ver1.1.csv')
+```
+
+Checking for missing data 
+```{r}
+sum(is.na(admit_df))
+```
+
+Here, we see that we have no missing data in the dataset
+
+```{r}
+admit_df = admit_df %>% janitor::clean_names() %>% 
+  select(-serial_no)
+```
+
+```{r}
+X = model.matrix(chance_of_admit~., admit_df)[,-1]
+y = admit_df$chance_of_admit
+```
+
+```{r}
+theme1 <- trellis.par.get()
+theme1$plot.symbol$col <- rgb(.2, .4, .2, .5)
+theme1$plot.symbol$pch <- 16
+theme1$plot.line$col <- rgb(.8, .1, .1, 1)
+theme1$plot.line$lwd <- 2
+theme1$strip.background$col <- rgb(.0, .2, .6, .2)
+trellis.par.set(theme1)
+featurePlot(X, y, plot = "scatter", labels = c("","Y"),
+            type = c("p"), layout = c(4, 2))
+```
+
+From the plots we can see that most of our variables are linearly distributed. Because of that we will start with simple linear regression
+
+# Linear Regression
+
+```{r}
+ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+```
+
+
+```{r}
+seed = 2
+set.seed(seed)
+lm.fit <- train(X, y,
+                method = "lm",
+                trControl = ctrl1)
+```
+
+# Lasso
+
+```{r}
+set.seed(2)
+lasso.fit <- train(X, y,
+                     method = "glmnet",
+                     tuneGrid = expand.grid(alpha = 1, 
+                                            lambda = exp(seq(-10,10, length = 200))),
+                   # preProc = c("center", "scale"),
+                     trControl = ctrl1)
+
+plot(lasso.fit, xTrans = function(x) log(x))
+```
+
+Test
+```{r}
+lasso.pred = predict(lasso.fit$finalModel, s = bestlam.lasso, newx = X.test)
+mean((lasso.pred - y.test)^2)
+```
+
+```{r}
+set.seed(seed)
+ridge.fit <- train(X, y,
+                     method = "glmnet",
+                     tuneGrid = expand.grid(alpha = 0, 
+                                            lambda = exp(seq(-10, 10, length = 200))),
+                     trControl = ctrl1)
+
+plot(ridge.fit, xTrans = function(x) log(x))
+```
+
+```{r}
+set.seed(seed)
+enet.fit <- train(X, y,
+                     method = "glmnet",
+                     tuneGrid = expand.grid(alpha = seq(0, 1, length = 5), 
+                                            # We are seeing if alpha between 0 and 1 is better
+                                            lambda = exp(seq(-2, 4, length = 50))),
+                   # preProc = c("center", "scale"),
+                     trControl = ctrl1)
+
+# for each alpha we have 50 lambdas. 
+enet.fit$bestTune
+```
+
+```{r}
+ggplot(enet.fit)
+```
+
+```{r}
+resamp <- resamples(list(lasso = lasso.fit, 
+                         ridge = ridge.fit, 
+                         pcr = pcr.fit,
+                         lm = lm.fit))
+summary(resamp)
+```
+
+
+
