@@ -121,11 +121,55 @@ enet.fit$bestTune
 ggplot(enet.fit)
 ```
 
+# GAM
+
+```{r}
+set.seed(seed)
+gam.fit <- train(X, y,
+                 method = "gam",
+                 tuneGrid = data.frame(method = "GCV.Cp", select = c(TRUE,FALSE)),
+                 trControl = ctrl1)
+gam.fit$bestTune
+gam.fit$finalModel
+```
+
+## Multivariate Adaptive Regression Splines (MARS)
+
+```{r}
+library(pdp)
+library(earth)
+```
+
+```{r}
+mars_grid <- expand.grid(degree = 1:2, 
+                         nprune = 2:10)
+set.seed(2)
+mars.fit <- train(X, y,
+                 method = "earth",
+                 tuneGrid = mars_grid,
+                 trControl = ctrl1)
+ggplot(mars.fit)
+mars.fit$bestTune
+coef(mars.fit$finalModel)
+```
+
+To better understand the relationship between these features and `lpsa`, we can create partial dependence plots (PDPs) for each feature individually and also an interaction PDP. This is used to examine the marginal effects of predictors.
+
+```{r}
+p1 <- partial(mars.fit, pred.var = c("gre_score"), grid.resolution = 10) %>% autoplot()
+p2 <- partial(mars.fit, pred.var = c("gre_score", "toefl_score"), grid.resolution = 10) %>% plotPartial(levelplot = FALSE, zlab = "yhat", drape = TRUE, 
+            screen = list(z = 20, x = -60))
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
 ```{r}
 resamp <- resamples(list(lasso = lasso.fit, 
                          ridge = ridge.fit, 
                          pcr = pcr.fit,
-                         lm = lm.fit))
+                         lm = lm.fit,
+                         mars = mars.fit,
+                         gam = gam.fit))
 summary(resamp)
 ```
 
