@@ -83,13 +83,15 @@ lasso.fit <- train(X, y,
                    # preProc = c("center", "scale"),
                      trControl = ctrl1)
 
+bestlam.lasso = lasso.fit$bestTune$lambda
+
 plot(lasso.fit, xTrans = function(x) log(x))
 ```
 
 Test
 ```{r}
-lasso.pred = predict(lasso.fit$finalModel, s = bestlam.lasso, newx = X.test)
-mean((lasso.pred - y.test)^2)
+lasso.pred = predict(lasso.fit$finalModel, s = bestlam.lasso, newx = X)
+mean((lasso.pred - y)^2)
 ```
 
 ```{r}
