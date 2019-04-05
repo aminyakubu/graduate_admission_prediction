@@ -21,10 +21,13 @@ library(pROC)
 library(AppliedPredictiveModeling)
 ```
 
+# Load Data
 
 ```{r}
 admit_df = read_csv('data/Admission_Predict_Ver1.1.csv')
 ```
+
+#Pre-processing Data
 
 Checking for missing data 
 ```{r}
@@ -33,10 +36,28 @@ sum(is.na(admit_df))
 
 Here, we see that we have no missing data in the dataset
 
+Removal of unnecessary variables
 ```{r}
 admit_df = admit_df %>% janitor::clean_names() %>% 
   select(-serial_no)
 ```
+
+Centering data
+```{r}
+center_colmeans <- function(x) {
+    xcenter = colMeans(x)
+    x - rep(xcenter, rep.int(nrow(x), ncol(x)))
+}
+
+#I did not save this as a new variable... I'm not entirely sure if we need to or why we should center
+center_colmeans(admit_df)
+```
+
+Find Linear Dependencies
+```{r}
+findLinearCombos(admit_df)
+```
+
 
 ```{r}
 X = model.matrix(chance_of_admit~., admit_df)[,-1]
@@ -57,9 +78,7 @@ featurePlot(X, y, plot = "scatter", labels = c("","Y"),
 
 From the plots we can see that most of our variables are linearly distributed. Because of that we will start with simple linear regression
 
-```{r}
-findLinearCombos(admit_df)
-```
+
 ```{r}
 ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
 ```
@@ -68,7 +87,6 @@ ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
 # Linear Regression
 
 ```{r}
-seed = 2
 set.seed(2)
 lm.fit <- train(X, y,
                 method = "lm",
@@ -94,7 +112,6 @@ lasso.fit <- train(X, y,
 plot(lasso.fit, xTrans = function(x) log(x))
 ```
 
-Test
 ```{r}
 bestlam.lasso = lasso.fit$bestTune$lambda
 
