@@ -165,7 +165,7 @@ mars.fit$bestTune
 coef(mars.fit$finalModel)
 ```
 
-To better understand the relationship between these features and `lpsa`, we can create partial dependence plots (PDPs) for each feature individually and also an interaction PDP. This is used to examine the marginal effects of predictors.
+To better understand the relationship between these features and `chance_of_admit`, we can create partial dependence plots (PDPs) for each feature individually and also an interaction PDP. This is used to examine the marginal effects of predictors.
 
 ```{r}
 p1 <- partial(mars.fit, pred.var = c("gre_score"), grid.resolution = 10) %>% autoplot()
