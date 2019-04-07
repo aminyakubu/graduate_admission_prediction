@@ -46,10 +46,16 @@ admit_df = admit_df[,-1]
 
 The variable `serial_no` is removed.
 
-Centering data
 ```{r}
 summary(lm(chance_of_admit~., admit_df))
 ```
+
+We will remove the variables `university_rating` and `sop`, 
+
+```{r}
+admit_df = admit_df[,-c(3, 4)]
+```
+
 
 Find Linear Dependencies
 ```{r}
