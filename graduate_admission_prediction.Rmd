@@ -7,6 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
 ```
 
 # Loading libraries
@@ -38,8 +40,8 @@ Here, we see that we have no missing data in the dataset
 
 Removal of unnecessary variables
 ```{r}
-admit_df = admit_df %>% janitor::clean_names() %>% 
-  select(-serial_no)
+admit_df = admit_df %>% janitor::clean_names() 
+admit_df = admit_df[,-1]
 ```
 
 The variable `serial_no` is removed.
