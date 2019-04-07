@@ -50,7 +50,7 @@ center_colmeans <- function(x) {
 }
 
 #I did not save this as a new variable... I'm not entirely sure if we need to or why we should center
-center_colmeans(admit_df)
+admit_df1 = center_colmeans(admit_df)
 ```
 
 Find Linear Dependencies
@@ -76,7 +76,13 @@ featurePlot(X, y, plot = "scatter", labels = c("","Y"),
             type = c("p"), layout = c(4, 2))
 ```
 
+Each predictor
+
 From the plots we can see that most of our variables are linearly distributed. Because of that we will start with simple linear regression
+
+```{r}
+corrplot::corrplot(cor(X))
+```
 
 
 ```{r}
@@ -91,9 +97,7 @@ set.seed(2)
 lm.fit <- train(X, y,
                 method = "lm",
                 trControl = ctrl1)
-```
 
-```{r}
 lm.pred <- predict(lm.fit$finalModel, newdata = data.frame(X))
 mean((lm.pred - y)^2)
 ```
@@ -110,9 +114,7 @@ lasso.fit <- train(X, y,
                      trControl = ctrl1)
 
 plot(lasso.fit, xTrans = function(x) log(x))
-```
 
-```{r}
 bestlam.lasso = lasso.fit$bestTune$lambda
 
 lasso.pred = predict(lasso.fit$finalModel, s = bestlam.lasso, newx = X)
@@ -130,9 +132,7 @@ ridge.fit <- train(X, y,
                      trControl = ctrl1)
 
 plot(ridge.fit, xTrans = function(x) log(x))
-```
 
-```{r}
 bestlam.ridge = ridge.fit$bestTune$lambda
 
 ridge.pred = predict(ridge.fit$finalModel, s = bestlam.ridge, newx = X)
@@ -150,9 +150,7 @@ pcr.fit <- train(X, y,
                  scale = T)
 
 plot(pcr.fit)
-```
 
-```{r}
 pcr.pred <- predict(pcr.fit$finalModel, newdata = X, 
                     ncomp = pcr.fit$bestTune$ncomp)
 mean((pcr.pred - y)^2)
@@ -172,9 +170,7 @@ enet.fit <- train(X, y,
 
 # for each alpha we have 50 lambdas. 
 enet.fit$bestTune
-```
 
-```{r}
 ggplot(enet.fit)
 ```
 
