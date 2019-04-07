@@ -44,7 +44,6 @@ admit_df = admit_df %>% janitor::clean_names() %>%
 
 The variable `serial_no` is removed.
 
-
 Centering data
 ```{r}
 center_colmeans <- function(x) {
@@ -226,6 +225,7 @@ resamp <- resamples(list(lasso = lasso.fit,
                          ridge = ridge.fit, 
                          pcr = pcr.fit,
                          lm = lm.fit,
+                         enet = enet.fit,
                          mars = mars.fit,
                          gam = gam.fit))
 summary(resamp)
