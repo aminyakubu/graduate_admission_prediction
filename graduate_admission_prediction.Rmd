@@ -50,7 +50,7 @@ The variable `serial_no` is removed.
 summary(lm(chance_of_admit~., admit_df))
 ```
 
-We will remove the variables `university_rating` and `sop`, 
+We will remove the variables `university_rating` and `sop`. 
 
 ```{r}
 admit_df = admit_df[,-c(3, 4)]
@@ -89,6 +89,7 @@ From the plots we can see that most of our variables are linearly distributed. B
 corrplot::corrplot(cor(X))
 ```
 
+The predictors in this dataset 
 
 ```{r}
 ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
