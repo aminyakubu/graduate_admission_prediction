@@ -21,6 +21,8 @@ library(e1071)
 library(mlbench)
 library(pROC)
 library(AppliedPredictiveModeling)
+library(gam)
+library(car)
 ```
 
 # Load Data
@@ -28,8 +30,6 @@ library(AppliedPredictiveModeling)
 ```{r}
 admit_df = read_csv('data/Admission_Predict_Ver1.1.csv')
 ```
-
-#Pre-processing Data
 
 Checking for missing data 
 ```{r}
@@ -45,24 +45,6 @@ admit_df = admit_df[,-1]
 ```
 
 The variable `serial_no` is removed.
-
-```{r}
-summary(lm(chance_of_admit~., admit_df))
-```
-
-We will remove the variables `university_rating` and `sop`. 
-
-```{r}
-admit_df = admit_df[,-c(3, 4)]
-```
-
-
-Find Linear Dependencies
-```{r}
-findLinearCombos(admit_df)
-```
-
-There are no linear dependencies and therefore no predictors need to be removed.
 
 ```{r}
 X = model.matrix(chance_of_admit~., admit_df)[,-1]
@@ -92,9 +74,49 @@ corrplot::corrplot(cor(X))
 The predictors in this dataset 
 
 ```{r}
-ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+summary(admit_df)
 ```
 
+Let's start with a simple linear regression
+
+```{r}
+fit = lm(chance_of_admit~., admit_df)
+summary(fit)
+```
+
+```{r}
+vif(fit)
+```
+
+We see that university rating and sop are not associated with chance of admission due to their large p values. We will remove the variables `university_rating` and `sop`. 
+
+Diagnositcs 
+
+```{r}
+par(mfrow = c(2,2)) 
+plot(fit)
+```
+
+```{r}
+admit_df = admit_df[,-c(3, 4)]
+```
+
+```{r}
+X = model.matrix(chance_of_admit~., admit_df)[,-1]
+y = admit_df$chance_of_admit
+```
+
+Find Linear Dependencies
+```{r}
+findLinearCombos(admit_df)
+```
+
+There are no linear dependencies and therefore no predictors need to be removed.
+
+```{r}
+ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+
+```
 
 # Linear Regression
 
@@ -104,89 +126,19 @@ lm.fit <- train(X, y,
                 method = "lm",
                 trControl = ctrl1)
 
-lm.pred <- predict(lm.fit$finalModel, newdata = data.frame(X))
-mean((lm.pred - y)^2)
-```
+getTrainPerf(lm.fit)
 
-# Lasso
-
-```{r}
-set.seed(2)
-lasso.fit <- train(X, y,
-                     method = "glmnet",
-                     tuneGrid = expand.grid(alpha = 1, 
-                                            lambda = exp(seq(-10,10, length = 200))),
-                   # preProc = c("center", "scale"),
-                     trControl = ctrl1)
-
-plot(lasso.fit, xTrans = function(x) log(x))
-
-bestlam.lasso = lasso.fit$bestTune$lambda
-
-lasso.pred = predict(lasso.fit$finalModel, s = bestlam.lasso, newx = X)
-mean((lasso.pred - y)^2)
-```
-
-# Ridge
-
-```{r}
-set.seed(2)
-ridge.fit <- train(X, y,
-                     method = "glmnet",
-                     tuneGrid = expand.grid(alpha = 0, 
-                                            lambda = exp(seq(-10, 10, length = 200))),
-                     trControl = ctrl1)
-
-plot(ridge.fit, xTrans = function(x) log(x))
-
-bestlam.ridge = ridge.fit$bestTune$lambda
-
-ridge.pred = predict(ridge.fit$finalModel, s = bestlam.ridge, newx = X)
-mean((ridge.pred - y)^2)
-```
-
-# PCR
-
-```{r}
-set.seed(2)
-pcr.fit <- train(X, y,
-                 method = "pcr",
-                 tuneLength = 7,
-                 trControl = ctrl1,
-                 scale = T)
-
-plot(pcr.fit)
-
-pcr.pred <- predict(pcr.fit$finalModel, newdata = X, 
-                    ncomp = pcr.fit$bestTune$ncomp)
-mean((pcr.pred - y)^2)
-```
-
-# Elastic Net
-
-```{r}
-set.seed(2)
-enet.fit <- train(X, y,
-                     method = "glmnet",
-                     tuneGrid = expand.grid(alpha = seq(0, 1, length = 5), 
-                                            # We are seeing if alpha between 0 and 1 is better
-                                            lambda = exp(seq(-2, 4, length = 50))),
-                   # preProc = c("center", "scale"),
-                     trControl = ctrl1)
-
-# for each alpha we have 50 lambdas. 
-enet.fit$bestTune
-
-ggplot(enet.fit)
 ```
 
 # GAM
+
+GRE score and toefl scores shows some none linear trends at the top
 
 ```{r}
 set.seed(2)
 gam.fit <- train(X, y,
                  method = "gam",
-                 tuneGrid = data.frame(method = "GCV.Cp", select = c(TRUE,FALSE)),
+                 tuneGrid = data.frame(method = "GCV.Cp", select = c(TRUE, FALSE)),
                  trControl = ctrl1)
 
 gam.fit$bestTune
@@ -201,8 +153,8 @@ library(earth)
 ```
 
 ```{r}
-mars_grid <- expand.grid(degree = 1:2, 
-                         nprune = 2:10)
+mars_grid <- expand.grid(degree = 1:4, 
+                         nprune = 2:15)
 set.seed(2)
 mars.fit <- train(X, y,
                  method = "earth",
@@ -221,6 +173,74 @@ p2 <- partial(mars.fit, pred.var = c("gre_score", "toefl_score"), grid.resolutio
             screen = list(z = 20, x = -60))
 
 grid.arrange(p1, p2, ncol = 2)
+```
+
+# Regularized methods 
+
+# Lasso
+
+```{r}
+set.seed(2)
+lasso.fit <- train(X, y,
+                     method = "glmnet",
+                     tuneGrid = expand.grid(alpha = 1, 
+                                            lambda = exp(seq(-11,11, length = 300))),
+                   # preProc = c("center", "scale"),
+                     trControl = ctrl1)
+
+plot(lasso.fit, xTrans = function(x) log(x))
+
+getTrainPerf(lasso.fit)
+lasso.fit$bestTune$lambda
+```
+
+# Ridge
+
+```{r}
+set.seed(2)
+ridge.fit <- train(X, y,
+                     method = "glmnet",
+                     tuneGrid = expand.grid(alpha = 0, 
+                                            lambda = exp(seq(-11, 11, length = 300))),
+                     trControl = ctrl1)
+
+plot(ridge.fit, xTrans = function(x) log(x))
+
+getTrainPerf(lasso.fit)
+ridge.fit$bestTune$lambda
+```
+
+# Elastic Net
+
+```{r}
+set.seed(2)
+enet.fit <- train(X, y,
+                     method = "glmnet",
+                     tuneGrid = expand.grid(alpha = seq(0, 1, length = 5), 
+                                            lambda = exp(seq(-2, 4, length = 50))),
+                     trControl = ctrl1)
+
+plot(enet.fit)
+enet.fit$bestTune
+ggplot(enet.fit)
+```
+
+# PCR
+
+```{r}
+set.seed(2)
+pcr.fit <- train(X, y,
+                 method = "pcr",
+                 tuneLength = 7,
+                 trControl = ctrl1,
+                 scale = T)
+
+plot(pcr.fit)
+
+pcr.pred <- predict(pcr.fit$finalModel, newdata = X, 
+                    ncomp = pcr.fit$bestTune$ncomp)
+
+mean((pcr.pred - y)^2)
 ```
 
 ```{r}
