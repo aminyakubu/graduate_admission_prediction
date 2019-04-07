@@ -48,13 +48,7 @@ The variable `serial_no` is removed.
 
 Centering data
 ```{r}
-center_colmeans <- function(x) {
-    xcenter = colMeans(x)
-    x - rep(xcenter, rep.int(nrow(x), ncol(x)))
-}
-
-#... I'm not entirely sure if we need to or why we should center
-admit_df1 = center_colmeans(admit_df)
+summary(lm(chance_of_admit~., admit_df))
 ```
 
 Find Linear Dependencies
