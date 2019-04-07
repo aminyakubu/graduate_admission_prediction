@@ -42,6 +42,9 @@ admit_df = admit_df %>% janitor::clean_names() %>%
   select(-serial_no)
 ```
 
+The variable `serial_no` is removed.
+
+
 Centering data
 ```{r}
 center_colmeans <- function(x) {
@@ -49,7 +52,7 @@ center_colmeans <- function(x) {
     x - rep(xcenter, rep.int(nrow(x), ncol(x)))
 }
 
-#I did not save this as a new variable... I'm not entirely sure if we need to or why we should center
+#... I'm not entirely sure if we need to or why we should center
 admit_df1 = center_colmeans(admit_df)
 ```
 
@@ -58,6 +61,7 @@ Find Linear Dependencies
 findLinearCombos(admit_df)
 ```
 
+There are no linear dependencies and therefore no predictors need to be removed.
 
 ```{r}
 X = model.matrix(chance_of_admit~., admit_df)[,-1]
@@ -76,7 +80,7 @@ featurePlot(X, y, plot = "scatter", labels = c("","Y"),
             type = c("p"), layout = c(4, 2))
 ```
 
-Each predictor
+Each predictor is plotted against the response, `chance_of_admit`. The continuous variables `cgpa`, `gre_score`, and `toefl_score` all have a positive linear relationship with the outcome. This also appears to be the case with the categorical variables, with the response increasing on average with each increase in predictor value.
 
 From the plots we can see that most of our variables are linearly distributed. Because of that we will start with simple linear regression
 
@@ -182,6 +186,7 @@ gam.fit <- train(X, y,
                  method = "gam",
                  tuneGrid = data.frame(method = "GCV.Cp", select = c(TRUE,FALSE)),
                  trControl = ctrl1)
+
 gam.fit$bestTune
 gam.fit$finalModel
 ```
