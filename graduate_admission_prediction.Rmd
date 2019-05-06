@@ -28,7 +28,7 @@ library(car)
 # Load Data
 
 ```{r}
-admit_df = read_csv('data/Admission_Predict_Ver1.1.csv')
+admit_df = read_csv('./data/Admission_Predict_Ver1.1.csv')
 ```
 
 Checking for missing data 
@@ -88,7 +88,9 @@ summary(fit)
 vif(fit)
 ```
 
-We see that university rating and sop are not associated with chance of admission due to their large p values. We will remove the variables `university_rating` and `sop`. 
+We see that `university_rating` and `sop` are not associated with chance of admission due to their large p values. However, we will not remove these variables as we believe they are significant contributors to whether or not a student is admitted. 
+
+We also see that the no variance inflation factors are above 10, indicating that there is no multicollinearity.
 
 Diagnositcs 
 
@@ -98,20 +100,14 @@ plot(fit)
 ```
 
 ```{r}
-admit_df = admit_df[,-c(3, 4)]
+#this is code used to remove "university_rating" and "sop"
+#admit_df = admit_df[,-c(3, 4)]
 ```
 
 ```{r}
 X = model.matrix(chance_of_admit~., admit_df)[,-1]
 y = admit_df$chance_of_admit
 ```
-
-Find Linear Dependencies
-```{r}
-findLinearCombos(admit_df)
-```
-
-There are no linear dependencies and therefore no predictors need to be removed.
 
 ```{r}
 ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
