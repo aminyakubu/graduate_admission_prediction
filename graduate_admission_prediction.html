@@ -292,7 +292,7 @@ ggplot(mars.fit)</code></pre>
 ##       -0.002198463        0.020092667       -0.007581152 
 ##           research 
 ##        0.025770406</code></pre>
-<p>To better understand the relationship between these features and <code>lpsa</code>, we can create partial dependence plots (PDPs) for each feature individually and also an interaction PDP. This is used to examine the marginal effects of predictors.</p>
+<p>To better understand the relationship between these features and <code>chance_of_admit</code>, we can create partial dependence plots (PDPs) for each feature individually and also an interaction PDP. This is used to examine the marginal effects of predictors.</p>
 <pre class="r"><code>p1 &lt;- partial(mars.fit, pred.var = c(&quot;gre_score&quot;), grid.resolution = 10) %&gt;% autoplot()
 p2 &lt;- partial(mars.fit, pred.var = c(&quot;gre_score&quot;, &quot;toefl_score&quot;), grid.resolution = 10) %&gt;% plotPartial(levelplot = FALSE, zlab = &quot;yhat&quot;, drape = TRUE, 
             screen = list(z = 20, x = -60))
