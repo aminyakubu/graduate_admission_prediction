@@ -23,28 +23,38 @@ library(pROC)
 library(AppliedPredictiveModeling)
 library(gam)
 library(car)
+library(pdp)
+library(earth)
+library(rpart) 
+library(rpart.plot)
+library(party) 
+library(partykit) 
+library(randomForest) 
+library(ranger) 
+library(gbm) 
+library(plotmo)
+library(pdp) 
+library(lime)
 ```
 
-# Load Data
+# Load Data & Clean
+
+The variable `serial_no` is removed because it's the unique identifier 
 
 ```{r}
-admit_df = read_csv('./data/Admission_Predict_Ver1.1.csv')
+admit_df = read_csv('./data/Admission_Predict_Ver1.1.csv') %>% 
+  janitor::clean_names() 
+
+admit_df = admit_df[,-1]
 ```
 
 Checking for missing data 
+
 ```{r}
 sum(is.na(admit_df))
 ```
 
 Here, we see that we have no missing data in the dataset
-
-Removal of unnecessary variables
-```{r}
-admit_df = admit_df %>% janitor::clean_names() 
-admit_df = admit_df[,-1]
-```
-
-The variable `serial_no` is removed.
 
 ```{r}
 X = model.matrix(chance_of_admit~., admit_df)[,-1]
@@ -77,53 +87,24 @@ The predictors in this dataset
 summary(admit_df)
 ```
 
-Let's start with a simple linear regression
+# Linear regression
+
+Let's start with a linear regression
 
 ```{r}
-fit = lm(chance_of_admit~., admit_df)
-summary(fit)
-```
-
-```{r}
-vif(fit)
-```
-
-We see that `university_rating` and `sop` are not associated with chance of admission due to their large p values. However, we will not remove these variables as we believe they are significant contributors to whether or not a student is admitted. 
-
-We also see that the no variance inflation factors are above 10, indicating that there is no multicollinearity.
-
-Diagnositcs 
-
-```{r}
-par(mfrow = c(2,2)) 
-plot(fit)
-```
-
-```{r}
-#this is code used to remove "university_rating" and "sop"
-#admit_df = admit_df[,-c(3, 4)]
-```
-
-```{r}
-X = model.matrix(chance_of_admit~., admit_df)[,-1]
-y = admit_df$chance_of_admit
-```
-
-```{r}
+seed = 2
 ctrl1 <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
-
 ```
 
 # Linear Regression
 
 ```{r}
-set.seed(2)
-lm.fit <- train(X, y,
+set.seed(seed)
+lm.fit <- train(chance_of_admit ~., admit_df,
                 method = "lm",
                 trControl = ctrl1)
 
 getTrainPerf(lm.fit)
-
 ```
 
 # GAM
@@ -131,8 +112,8 @@ getTrainPerf(lm.fit)
 GRE score and toefl scores shows some none linear trends at the top
 
 ```{r}
-set.seed(2)
-gam.fit <- train(X, y,
+set.seed(seed)
+gam.fit <- train(chance_of_admit ~., admit_df,
                  method = "gam",
                  tuneGrid = data.frame(method = "GCV.Cp", select = c(TRUE, FALSE)),
                  trControl = ctrl1)
@@ -144,15 +125,10 @@ gam.fit$finalModel
 ## Multivariate Adaptive Regression Splines (MARS)
 
 ```{r}
-library(pdp)
-library(earth)
-```
-
-```{r}
 mars_grid <- expand.grid(degree = 1:4, 
                          nprune = 2:15)
-set.seed(2)
-mars.fit <- train(X, y,
+set.seed(seed)
+mars.fit <- train(chance_of_admit ~., admit_df,
                  method = "earth",
                  tuneGrid = mars_grid,
                  trControl = ctrl1)
@@ -177,11 +153,10 @@ grid.arrange(p1, p2, ncol = 2)
 
 ```{r}
 set.seed(2)
-lasso.fit <- train(X, y,
+lasso.fit <- train(chance_of_admit ~., admit_df,
                      method = "glmnet",
                      tuneGrid = expand.grid(alpha = 1, 
                                             lambda = exp(seq(-11,11, length = 300))),
-                   # preProc = c("center", "scale"),
                      trControl = ctrl1)
 
 plot(lasso.fit, xTrans = function(x) log(x))
@@ -193,11 +168,11 @@ lasso.fit$bestTune$lambda
 # Ridge
 
 ```{r}
-set.seed(2)
-ridge.fit <- train(X, y,
+set.seed(seed)
+ridge.fit <- train(chance_of_admit ~., admit_df,
                      method = "glmnet",
                      tuneGrid = expand.grid(alpha = 0, 
-                                            lambda = exp(seq(-11, 11, length = 300))),
+                                            lambda = exp(seq(-11, 11, length = 200))),
                      trControl = ctrl1)
 
 plot(ridge.fit, xTrans = function(x) log(x))
@@ -210,9 +185,9 @@ ridge.fit$bestTune$lambda
 
 ```{r}
 set.seed(2)
-enet.fit <- train(X, y,
+enet.fit <- train(chance_of_admit ~., admit_df,
                      method = "glmnet",
-                     tuneGrid = expand.grid(alpha = seq(0, 1, length = 5), 
+                     tuneGrid = expand.grid(alpha = seq(0, 1, length = 6), 
                                             lambda = exp(seq(-2, 4, length = 50))),
                      trControl = ctrl1)
 
@@ -224,32 +199,144 @@ ggplot(enet.fit)
 # PCR
 
 ```{r}
-set.seed(2)
-pcr.fit <- train(X, y,
+set.seed(seed)
+pcr.fit <- train(chance_of_admit ~., admit_df,
                  method = "pcr",
                  tuneLength = 7,
                  trControl = ctrl1,
                  scale = T)
 
 plot(pcr.fit)
+```
 
-pcr.pred <- predict(pcr.fit$finalModel, newdata = X, 
-                    ncomp = pcr.fit$bestTune$ncomp)
 
-mean((pcr.pred - y)^2)
+# Tree-Based Models
+
+```{r}
+set.seed(seed)
+# tune over cp, method = "rpart"
+rpart.fit <- train(chance_of_admit ~., admit_df, 
+                   method = "rpart",
+                   tuneGrid = data.frame(cp = exp(seq(-6,-2, length = 20))),
+                   trControl = ctrl1)
+
+ggplot(rpart.fit, highlight = TRUE)
+rpart.plot(rpart.fit$finalModel)
+```
+
+# Bagging
+
+```{r}
+bagging.grid <- expand.grid(mtry = 7, 
+                       splitrule = "variance",
+                       min.node.size = 1:10) 
+set.seed(seed)
+bagging <- train(chance_of_admit ~., admit_df, 
+                method = "ranger",
+                tuneGrid = bagging.grid,
+                trControl = ctrl1,
+                importance = 'permutation')
+
+ggplot(bagging, highlight = TRUE)
+
+barplot(sort(ranger::importance(bagging$finalModel), decreasing = FALSE), 
+        las = 2, horiz = TRUE, cex.names = 0.7,
+        col = colorRampPalette(colors = c("darkred","white","darkblue"))(19))
+
+bagging$results[which.min(bagging$results[,5]),]
+```
+
+# Random forest
+
+```{r}
+rf.grid = expand.grid(mtry = 1:3, 
+                       splitrule = "variance",
+                       min.node.size = 1:10)
+set.seed(seed)
+rf.fit = train(chance_of_admit ~., admit_df, 
+                method = "ranger", 
+                tuneGrid = rf.grid,
+                trControl = ctrl1,
+                importance = 'permutation')
+ggplot(rf.fit, highlight = TRUE)
+
+barplot(sort(ranger::importance(rf.fit$finalModel), decreasing = FALSE), 
+        las = 2, horiz = TRUE, cex.names = 0.7,
+        col = colorRampPalette(colors = c("darkred","white","darkblue"))(19))
+```
+
+
+#GBM 
+
+```{r}
+gbm.grid = expand.grid(n.trees = c(1000, 2000,3000, 5000),
+                        interaction.depth = 2:5, 
+                        shrinkage = c(0.01,0.001,0.003,0.005),
+                        n.minobsinnode = 1)
+set.seed(seed)
+gbm.fit = train(chance_of_admit ~., admit_df, 
+                 method = "gbm",
+                 tuneGrid = gbm.grid,
+                 verbose = TRUE,
+                 trControl = ctrl1)
+ggplot(gbm.fit, highlight = TRUE)
 ```
 
 ```{r}
-resamp <- resamples(list(lasso = lasso.fit, 
-                         ridge = ridge.fit, 
-                         pcr = pcr.fit,
-                         lm = lm.fit,
-                         enet = enet.fit,
+summary(gbm.fit$finalModel, las = 2, cBars = 19, cex.names = 0.6)
+```
+
+# Vanilla Neural Network - single layer neural network
+
+```{r}
+nnetGrid = expand.grid(size = seq(from = 5, to = 50, by = 5), 
+                        decay = exp(seq(from = -6, to = -1, length = 15)))
+set.seed(seed)
+rnnet.fit = train(x = X, y = y,
+                   method = "nnet",
+                   tuneGrid = nnetGrid,
+                   preProcess = c("center","scale"),
+                   trControl = ctrl1,
+                   linout = TRUE,
+                   trace = FALSE)
+
+ggplot(rnnet.fit, highlight = TRUE) + scale_shape_manual(values = rep(19,10), guide = FALSE)
+```
+
+Multi - hidden layer neural network using multilayer perceptron (backpropagation)
+
+```{r}
+mlp_grid = expand.grid(layer1 = 10,
+                       layer2 = 10,
+                       layer3 = 10)
+
+mlp_fit = train(x = X, 
+                y = y, 
+                method = "mlpML", 
+                preProc =  c('center', 'scale'),
+                trControl = ctrl1,
+                tuneGrid = mlp_grid)
+
+```
+
+```{r}
+resamp <- resamples(list(lm = lm.fit, 
+                         gam = gam.fit,
                          mars = mars.fit,
-                         gam = gam.fit))
+                         ridge = ridge.fit, 
+                         lasso = lasso.fit,
+                         enet = enet.fit,
+                         pcr = pcr.fit,
+                         decision_tree = rpart.fit,
+                         bagging = bagging,
+                         random_forest = rf.fit,
+                         boosting = gbm.fit,
+                         vanilla_NN = rnnet.fit,
+                         multi_NN = mlp_fit))
 summary(resamp)
 ```
 
 ```{r}
 bwplot(resamp, metric = "RMSE")
 ```
+
