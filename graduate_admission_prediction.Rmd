@@ -120,6 +120,19 @@ gam.fit <- train(chance_of_admit ~., admit_df,
 
 gam.fit$bestTune
 gam.fit$finalModel
+
+gam.fit2 = gam(chance_of_admit ~ lor +
+                s(cgpa) +
+                research +
+                s(gre_score) +
+                s(toefl_score) +
+                university_rating +
+                sop,
+                data = admit_df, method = 'GCV.Cp')
+
+plot(gam.fit2)
+gam.check(gam.fit2)
+summary(gam.fit2)
 ```
 
 ## Multivariate Adaptive Regression Splines (MARS)
@@ -206,7 +219,7 @@ pcr.fit <- train(chance_of_admit ~., admit_df,
                  trControl = ctrl1,
                  scale = T)
 
-plot(pcr.fit)
+ggplot(pcr.fit, highlight = T)
 ```
 
 
@@ -285,6 +298,64 @@ ggplot(gbm.fit, highlight = TRUE)
 ```{r}
 summary(gbm.fit$finalModel, las = 2, cBars = 19, cex.names = 0.6)
 ```
+
+Partial Dependence Plot 
+```{r}
+pdp.rf <- rf.fit %>% 
+  partial(pred.var = "cgpa", 
+          grid.resolution = 100) %>%
+  autoplot(rug = TRUE, train = admit_df) +
+  ggtitle("Random forest") 
+
+pdp.gbm <- gbm.fit %>% 
+  partial(pred.var = "cgpa", 
+          grid.resolution = 100) %>%
+  autoplot(rug = TRUE, train = admit_df) +
+  ggtitle("Boosting") 
+
+grid.arrange(pdp.rf, pdp.gbm, nrow = 1)
+```
+
+PDPs plot the change in the average predicted value as specified feature(s) vary over their marginal distribution. The PDP plot below displays the average change in predicted `chance_of_admit` as we vary `cgpa` while holding all other variables constant. 
+
+# ICE 
+
+```{r}
+ice1.rf <- rf.fit %>% 
+  partial(pred.var = "cgpa", 
+          grid.resolution = 100,
+          ice = TRUE) %>%
+  autoplot(train = admit_df, alpha = .1) +
+  ggtitle("Random forest, non-centered") 
+
+ice2.rf <- rf.fit %>% 
+  partial(pred.var = "cgpa", 
+          grid.resolution = 100,
+          ice = TRUE) %>%
+  autoplot(train = admit_df, alpha = .1, 
+           center = TRUE) +
+  ggtitle("Random forest, centered") 
+
+ice1.gbm <- gbm.fit %>% 
+  partial(pred.var = "cgpa", 
+          grid.resolution = 100,
+          ice = TRUE) %>%
+  autoplot(train = admit_df, alpha = .1) +
+  ggtitle("Boosting, non-centered") 
+
+ice2.gbm <- gbm.fit %>% 
+  partial(pred.var = "cgpa", 
+          grid.resolution = 100,
+          ice = TRUE) %>%
+  autoplot(train = admit_df, alpha = .1, 
+           center = TRUE) +
+  ggtitle("Boosting, centered") 
+
+grid.arrange(ice1.rf, ice2.rf, ice1.gbm, ice2.gbm,
+             nrow = 2, ncol = 2)
+```
+
+we are plotting the change in the predicted chance of admit for each observation as we vary each predictor variable. 
 
 # Vanilla Neural Network - single layer neural network
 
