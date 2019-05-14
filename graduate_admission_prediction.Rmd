@@ -201,7 +201,7 @@ set.seed(2)
 enet.fit <- train(chance_of_admit ~., admit_df,
                      method = "glmnet",
                      tuneGrid = expand.grid(alpha = seq(0, 1, length = 6), 
-                                            lambda = exp(seq(-2, 4, length = 50))),
+                                            lambda = exp(seq(-11, 11, length = 200))),
                      trControl = ctrl1)
 
 plot(enet.fit)
