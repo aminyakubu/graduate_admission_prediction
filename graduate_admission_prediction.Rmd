@@ -62,6 +62,7 @@ y = admit_df$chance_of_admit
 ```
 
 ```{r}
+tiff("featurplot.tiff", units = "in", width = 17, height = 16, res = 100)
 theme1 <- trellis.par.get()
 theme1$plot.symbol$col <- rgb(.2, .4, .2, .5)
 theme1$plot.symbol$pch <- 16
@@ -69,8 +70,15 @@ theme1$plot.line$col <- rgb(.8, .1, .1, 1)
 theme1$plot.line$lwd <- 2
 theme1$strip.background$col <- rgb(.0, .2, .6, .2)
 trellis.par.set(theme1)
-featurePlot(X, y, plot = "scatter", labels = c("","Y"),
-            type = c("p"), layout = c(4, 2))
+featurePlot(X[,c(-3,-7)], y, plot = "scatter", labels = c("","Y"),
+            type = c("p"), layout = c(2, 3))
+dev.off()
+
+tiff("boxplot.tiff", units = 'in', width = 15, height = 11, res = 100)
+par(mfrow = c(1,2))
+boxplot(chance_of_admit ~ research , data = admit_df)
+boxplot(chance_of_admit ~ university_rating , data = admit_df)
+dev.off()
 ```
 
 Each predictor is plotted against the response, `chance_of_admit`. The continuous variables `cgpa`, `gre_score`, and `toefl_score` all have a positive linear relationship with the outcome. This also appears to be the case with the categorical variables, with the response increasing on average with each increase in predictor value.
@@ -104,12 +112,10 @@ lm.fit <- train(chance_of_admit ~., admit_df,
                 method = "lm",
                 trControl = ctrl1)
 
-getTrainPerf(lm.fit)
+lm.fit
 ```
 
 # GAM
-
-GRE score and toefl scores shows some none linear trends at the top
 
 ```{r}
 set.seed(seed)
@@ -120,19 +126,8 @@ gam.fit <- train(chance_of_admit ~., admit_df,
 
 gam.fit$bestTune
 gam.fit$finalModel
+plot(gam.fit$finalModel)
 
-gam.fit2 = gam(chance_of_admit ~ lor +
-                s(cgpa) +
-                research +
-                s(gre_score) +
-                s(toefl_score) +
-                university_rating +
-                sop,
-                data = admit_df, method = 'GCV.Cp')
-
-plot(gam.fit2)
-gam.check(gam.fit2)
-summary(gam.fit2)
 ```
 
 ## Multivariate Adaptive Regression Splines (MARS)
@@ -165,17 +160,23 @@ grid.arrange(p1, p2, ncol = 2)
 # Lasso
 
 ```{r}
+par(mfrow = c(1,1))
 set.seed(2)
 lasso.fit <- train(chance_of_admit ~., admit_df,
                      method = "glmnet",
                      tuneGrid = expand.grid(alpha = 1, 
-                                            lambda = exp(seq(-11,11, length = 300))),
+                                            lambda = exp(seq(-20,-3, length = 100))),
                      trControl = ctrl1)
 
 plot(lasso.fit, xTrans = function(x) log(x))
 
 getTrainPerf(lasso.fit)
 lasso.fit$bestTune$lambda
+
+lasso.coef = predict(lasso.fit$finalModel, type = "coefficients", s = lasso.fit$bestTune$lambda)[1:ncol(X),]
+length(lasso.coef)
+
+length(lasso.coef[lasso.coef != 0])
 ```
 
 # Ridge
@@ -185,7 +186,7 @@ set.seed(seed)
 ridge.fit <- train(chance_of_admit ~., admit_df,
                      method = "glmnet",
                      tuneGrid = expand.grid(alpha = 0, 
-                                            lambda = exp(seq(-11, 11, length = 200))),
+                                            lambda = exp(seq(-20, -3, length = 100))),
                      trControl = ctrl1)
 
 plot(ridge.fit, xTrans = function(x) log(x))
@@ -201,27 +202,13 @@ set.seed(2)
 enet.fit <- train(chance_of_admit ~., admit_df,
                      method = "glmnet",
                      tuneGrid = expand.grid(alpha = seq(0, 1, length = 6), 
-                                            lambda = exp(seq(-2, 4, length = 50))),
+                                            lambda = exp(seq(-30, -3, length = 100))),
                      trControl = ctrl1)
 
 plot(enet.fit)
 enet.fit$bestTune
 ggplot(enet.fit)
 ```
-
-# PCR
-
-```{r}
-set.seed(seed)
-pcr.fit <- train(chance_of_admit ~., admit_df,
-                 method = "pcr",
-                 tuneLength = 7,
-                 trControl = ctrl1,
-                 scale = T)
-
-ggplot(pcr.fit, highlight = T)
-```
-
 
 # Tree-Based Models
 
@@ -240,6 +227,7 @@ rpart.plot(rpart.fit$finalModel)
 # Bagging
 
 ```{r}
+par(mfrow = c(1,3))
 bagging.grid <- expand.grid(mtry = 7, 
                        splitrule = "variance",
                        min.node.size = 1:10) 
@@ -279,13 +267,13 @@ barplot(sort(ranger::importance(rf.fit$finalModel), decreasing = FALSE),
 ```
 
 
-#GBM 
+# GBM 
 
 ```{r}
-gbm.grid = expand.grid(n.trees = c(1000, 2000,3000, 5000),
+gbm.grid = expand.grid(n.trees = c(500, 700, 1000, 2000),
                         interaction.depth = 2:5, 
                         shrinkage = c(0.01,0.001,0.003,0.005),
-                        n.minobsinnode = 1)
+                        n.minobsinnode = 1:5)
 set.seed(seed)
 gbm.fit = train(chance_of_admit ~., admit_df, 
                  method = "gbm",
@@ -300,6 +288,7 @@ summary(gbm.fit$finalModel, las = 2, cBars = 19, cex.names = 0.6)
 ```
 
 Partial Dependence Plot 
+
 ```{r}
 pdp.rf <- rf.fit %>% 
   partial(pred.var = "cgpa", 
@@ -357,39 +346,6 @@ grid.arrange(ice1.rf, ice2.rf, ice1.gbm, ice2.gbm,
 
 we are plotting the change in the predicted chance of admit for each observation as we vary each predictor variable. 
 
-# Vanilla Neural Network - single layer neural network
-
-```{r}
-nnetGrid = expand.grid(size = seq(from = 5, to = 50, by = 5), 
-                        decay = exp(seq(from = -6, to = -1, length = 15)))
-set.seed(seed)
-rnnet.fit = train(x = X, y = y,
-                   method = "nnet",
-                   tuneGrid = nnetGrid,
-                   preProcess = c("center","scale"),
-                   trControl = ctrl1,
-                   linout = TRUE,
-                   trace = FALSE)
-
-ggplot(rnnet.fit, highlight = TRUE) + scale_shape_manual(values = rep(19,10), guide = FALSE)
-```
-
-Multi - hidden layer neural network using multilayer perceptron (backpropagation)
-
-```{r}
-mlp_grid = expand.grid(layer1 = 10,
-                       layer2 = 10,
-                       layer3 = 10)
-
-mlp_fit = train(x = X, 
-                y = y, 
-                method = "mlpML", 
-                preProc =  c('center', 'scale'),
-                trControl = ctrl1,
-                tuneGrid = mlp_grid)
-
-```
-
 ```{r}
 resamp <- resamples(list(lm = lm.fit, 
                          gam = gam.fit,
@@ -397,13 +353,10 @@ resamp <- resamples(list(lm = lm.fit,
                          ridge = ridge.fit, 
                          lasso = lasso.fit,
                          enet = enet.fit,
-                         pcr = pcr.fit,
                          decision_tree = rpart.fit,
                          bagging = bagging,
                          random_forest = rf.fit,
-                         boosting = gbm.fit,
-                         vanilla_NN = rnnet.fit,
-                         multi_NN = mlp_fit))
+                         boosting = gbm.fit))
 summary(resamp)
 ```
 
